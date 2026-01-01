@@ -24,7 +24,8 @@
 
 uint64_t cache_miss[MAX_APP_THREAD][8];
 uint64_t cache_hit[MAX_APP_THREAD][8];
-uint64_t latency[MAX_APP_THREAD][LATENCY_WINDOWS];
+uint64_t latency[MAX_APP_THREAD][MAX_CORO_NUM][LATENCY_WINDOWS];
+volatile bool need_stop = false;
 
 StatHelper stat_helper;
 
@@ -2107,6 +2108,25 @@ void Tree::run_coroutine(CoroFunc func, int id, int coro_cnt, bool lock_bench,
   master();
 }
 
+void Tree::run_coroutine_ycsb(GenFunc gen_func, WorkFunc work_func, int coro_cnt, 
+                        Request* req, int req_num, int id) {
+  using namespace std::placeholders;
+  // coro_ops_total = total_ops;
+  // coro_ops_cnt_start = 0;
+  // coro_ops_cnt_finish = 0;
+
+  assert(coro_cnt <= define::kMaxCoro);
+  for (int i = 0; i < coro_cnt; ++i) {
+    RequstGen* gen = gen_func(dsm_client_, req, req_num, i, coro_cnt);
+    worker[i] =
+        CoroCall(std::bind(&Tree::coro_worker_ycsb, this, _1, gen, work_func, id, i));
+  }
+
+  master = CoroCall(std::bind(&Tree::coro_master_ycsb, this, _1, coro_cnt));
+
+  master();
+}
+
 void Tree::coro_worker(CoroYield &yield, RequstGen *gen, int coro_id,
                        bool lock_bench) {
   CoroContext ctx;
@@ -2149,6 +2169,28 @@ void Tree::coro_worker(CoroYield &yield, RequstGen *gen, int coro_id,
   yield(master);
 }
 
+void Tree::coro_worker_ycsb(CoroYield &yield, RequstGen *gen, WorkFunc work_func, int thread_id, int coro_id) 
+{
+    CoroContext ctx;
+    ctx.coro_id = coro_id;
+    ctx.master = &master;
+    ctx.yield = &yield;
+    Timer coro_timer;
+
+    while (!need_stop) 
+    {
+        auto r = gen->next();
+        coro_timer.begin();
+        work_func(this, r, &ctx);
+        auto us_10 = coro_timer.end() / 100;
+        if (us_10 >= LATENCY_WINDOWS) {
+          us_10 = LATENCY_WINDOWS - 1;
+        }
+        latency[thread_id][coro_id][us_10]++;
+    }
+
+}
+
 void Tree::coro_master(CoroYield &yield, int coro_cnt) {
   for (int i = 0; i < coro_cnt; ++i) {
     yield(worker[i]);
@@ -2172,6 +2214,22 @@ void Tree::coro_master(CoroYield &yield, int coro_cnt) {
   //        dsm_client_->get_my_thread_id(), coro_ops_cnt_start,
   //        coro_ops_cnt_finish);
   // fflush(stdout);
+}
+
+void Tree::coro_master_ycsb(CoroYield &yield, int coro_cnt) {
+    for (int i = 0; i < coro_cnt; ++i) {
+      yield(worker[i]);
+    }
+  
+    while (!need_stop) {
+      uint64_t next_coro_id;
+  
+      if (dsm_client_->PollRdmaCqOnce(next_coro_id)) {
+        yield(worker[next_coro_id]);
+      }
+
+    }
+
 }
 
 #ifdef USE_LOCAL_LOCK

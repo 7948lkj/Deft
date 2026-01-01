@@ -44,6 +44,8 @@
 
 #define APP_MESSAGE_NR 96
 
+#define MAX_CORO_NUM 8
+
 // }
 
 // { dir thread
@@ -87,7 +89,7 @@ static_assert(kRootPointerStoreOffest % sizeof(uint64_t) == 0, "XX");
 
 // lock on-chip memory
 constexpr uint64_t kLockStartAddr = 0;
-constexpr uint64_t kLockChipMemSize = 256 * 1024;
+constexpr uint64_t kLockChipMemSize = 128 * 1024;
 
 // number of locks
 // we do not use 16-bit locks, since 64-bit locks can provide enough concurrency.
@@ -147,11 +149,11 @@ struct KeyArr {
   bool operator==(const uint64_t &other) const { return arr[0] == other; }
   bool operator!=(const uint64_t &other) const { return arr[0] != other; }
 
-  auto operator<=>(const uint64_t &other) const { return arr[0] <=> other; }
+  // auto operator<=>(const uint64_t &other) const { return arr[0] <=> other; }
 
-  auto operator<=>(const KeyArr &other) const {
-    return arr[0] <=> other.arr[0];
-  }
+  // auto operator<=>(const KeyArr &other) const {
+  //   return arr[0] <=> other.arr[0];
+  // }
 } __attribute__((packed));
 
 using InternalKey = KeyArr;

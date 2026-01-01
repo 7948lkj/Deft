@@ -117,16 +117,16 @@ class Slice {
     return (size_ != b.size_) || (memcmp(data_, b.data_, size_) != 0);
   }
 
-  auto operator<=>(const Slice &b) const {
-    assert(data_ != nullptr && b.data_ != nullptr);
-    assert(size_ != 8 && b.size_ != 8);
-    const size_t min_len = (size_ < b.size_) ? size_ : b.size_;
-    int r = memcmp(data_, b.data_, min_len);
-    if (r == 0) {
-      return size_ <=> b.size_;
-    }
-    return r <=> 0;
-  }
+  // auto operator<=>(const Slice &b) const {
+  //   assert(data_ != nullptr && b.data_ != nullptr);
+  //   assert(size_ != 8 && b.size_ != 8);
+  //   const size_t min_len = (size_ < b.size_) ? size_ : b.size_;
+  //   int r = memcmp(data_, b.data_, min_len);
+  //   if (r == 0) {
+  //     return size_ <=> b.size_;
+  //   }
+  //   return r <=> 0;
+  // }
 
   // Three-way comparison.  Returns value:
   //   <  0 iff "*this" <  "b",

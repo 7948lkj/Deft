@@ -19,6 +19,10 @@
 #define UD_PKEY 0x11111111
 #define PSN 3185
 #define MAX_INLINE_DATA 316
+#define NET_DEV_NAME "ens2f0" // [CONFIG] enp202s0f0   (check from ifconfig)
+#define IB_DEV_NAME_IDX '2'       // [CONFIG] 2            (check from ibdev2netdev)
+#define MLX_PORT 1                // [CONFIG] 1            (check from ibdev2netdev)
+#define MLX_GID 2                 // [CONFIG] 1            (check from show_gids)
 
 constexpr int kOroMax = 3;
 struct RdmaOpRegion {
@@ -60,8 +64,8 @@ struct Region {
 };
 
 //// Resource.cpp
-bool createContext(RdmaContext *context, int nic_id = 0, uint8_t port = 1,
-                   int gidIndex = 3);
+bool createContext(RdmaContext *context, int nic_id = 0, uint8_t port = MLX_PORT,
+                   int gidIndex = MLX_GID);
 bool destoryContext(RdmaContext *context);
 
 ibv_mr *createMemoryRegion(uint64_t mm, uint64_t mmSize, RdmaContext *ctx);

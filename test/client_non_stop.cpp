@@ -172,7 +172,7 @@ void thread_run(int id) {
     if (us_10 >= LATENCY_WINDOWS) {
       us_10 = LATENCY_WINDOWS - 1;
     }
-    latency[id][us_10]++;
+    latency[id][0][us_10]++;
     stat_helper.add(id, lat_op, t);
 
     tp[id][0]++;
@@ -193,7 +193,8 @@ void cal_latency() {
   for (int i = 0; i < LATENCY_WINDOWS; ++i) {
     latency_th_all[i] = 0;
     for (int k = 0; k < MAX_APP_THREAD; ++k) {
-      latency_th_all[i] += latency[k][i];
+      for(int j = 0; j < MAX_CORO_NUM; ++j)
+      latency_th_all[i] += latency[k][j][i];
     }
     all_lat += latency_th_all[i];
   }

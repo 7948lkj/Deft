@@ -13,7 +13,7 @@
 class IndexCache;
 extern uint64_t cache_miss[MAX_APP_THREAD][8];
 extern uint64_t cache_hit[MAX_APP_THREAD][8];
-extern uint64_t latency[MAX_APP_THREAD][LATENCY_WINDOWS];
+extern uint64_t latency[MAX_APP_THREAD][MAX_CORO_NUM][LATENCY_WINDOWS];
 
 static inline uint32_t crc32(const char *buf, size_t len) {
   boost::crc_32_type result;
@@ -54,11 +54,20 @@ struct LocalLockNode {
   uint8_t hand_time;
 };
 
+enum RequestType : int {
+  INSERT = 0,
+  UPDATE,
+  SEARCH,
+  SCAN
+};
+
 struct Request {
+  RequestType req_type;
   bool is_search;
   bool is_scan;
   Key k;
   Value v;
+  int range_size;
 };
 
 class RequstGen {
@@ -67,7 +76,9 @@ public:
   virtual Request next() { return Request{}; }
 };
 
+// using CoroFunc = std::function<RequstGen *(int, DSMClient *, int)>;
 using CoroFunc = std::function<RequstGen *(int, DSMClient *, int)>;
+using GenFunc = std::function<RequstGen *(DSMClient *, Request*, int, int, int)>;
 
 struct SearchResult {
   bool is_leaf;
@@ -568,6 +579,7 @@ class LeafPage {
 
 class Tree {
  public:
+  using WorkFunc = std::function<void (Tree *, Request&, CoroContext *)>;
   Tree(DSMClient *dsm, uint16_t tree_id = 0);
   ~Tree();
 
@@ -581,6 +593,8 @@ class Tree {
 
   void run_coroutine(CoroFunc func, int id, int coro_cnt, bool lock_bench,
                      uint64_t total_ops);
+
+  void run_coroutine_ycsb(GenFunc gen_func, WorkFunc work_func, int coro_cnt, Request* req, int req_num, int id);
 
   void lock_bench(const Key &k, CoroContext *ctx = nullptr, int coro_id = 0);
 
@@ -612,7 +626,10 @@ class Tree {
 
   void coro_worker(CoroYield &yield, RequstGen *gen, int coro_id,
                    bool lock_bench);
+  void coro_worker_ycsb(CoroYield &yield, RequstGen *gen, WorkFunc work_func, int thread_id, int coro_id);
+
   void coro_master(CoroYield &yield, int coro_cnt);
+  void coro_master_ycsb(CoroYield &yield, int coro_cnt);
 
   // void broadcast_new_root(GlobalAddress new_root_addr, int root_level);
   bool update_new_root(GlobalAddress left, const Key &k, GlobalAddress right,

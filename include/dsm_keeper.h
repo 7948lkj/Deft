@@ -21,8 +21,8 @@
 class Keeper {
  protected:
   memcached_st *memc;
-  static constexpr char SERVER_NUM_KEY[] = "ServerNum";
-  static constexpr char CLIENT_NUM_KEY[] = "ClientNum";
+  static constexpr char* SERVER_NUM_KEY = "ServerNum";
+  static constexpr char* CLIENT_NUM_KEY = "ClientNum";
 
   bool ConnectMemcached();
   bool DisconnectMemcached();
@@ -65,9 +65,16 @@ class Keeper {
     MemcSet(key.c_str(), key.size(), (char *)&value, sizeof(value));
 
     uint64_t ret = 0;
-    for (int i = 0; i < cnt; ++i) {
-      key = key_prefix + std::to_string(i);
-      ret += *(uint64_t *)MemcGet(key.c_str(), key.size());
+    // for (int i = 0; i < cnt; ++i) {
+    //   key = key_prefix + std::to_string(i);
+    //   ret += *(uint64_t *)MemcGet(key.c_str(), key.size());
+    // }
+
+    if (my_id == 0) {  // only node 0 return the sum
+      for (int i = 0; i < cnt; ++i) {
+        key = key_prefix + std::to_string(i);
+        ret += *(uint64_t *)MemcGet(key.c_str(), key.size());
+      }
     }
 
     return ret;
