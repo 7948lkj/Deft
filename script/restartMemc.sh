@@ -19,8 +19,10 @@ port=$(awk 'NR==2{print}' ../memcached.conf)
   echo "flush_all"
   echo "set ServerNum 0 0 1"
   echo "0"
+  sleep 1
   echo "set ClientNum 0 0 1"
   echo "0"
+  sleep 1
   echo "quit"
 ) | telnet $addr $port
 

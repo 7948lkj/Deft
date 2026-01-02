@@ -44,7 +44,7 @@
 
 #define MAX_THREAD_REQUEST 10000000
 #define LOAD_HEARTBEAT 100000
-// #define USE_CORO
+#define USE_CORO
 #define EPOCH_LAT_TEST
 #define LOADER_NUM 8 // [CONFIG] 8
 
@@ -132,7 +132,7 @@ public:
       // }
     }
     tp[local_thread_id][coro_id]++;
-    req[cur].v += rand() % 1000;  // make value different per-epoch
+    req[cur].v = randval(e);
     return req[cur];
   }
 
