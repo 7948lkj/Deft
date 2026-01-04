@@ -9,6 +9,7 @@
 #include <atomic>
 #include <bitset>
 #include <limits>
+#include <queue>
 
 #include "Debug.h"
 #include "HugePageAlloc.h"
@@ -67,6 +68,7 @@ inline int bits_in(std::uint64_t u) {
 
 using CoroYield = boost::coroutines::symmetric_coroutine<void>::yield_type;
 using CoroCall = boost::coroutines::symmetric_coroutine<void>::call_type;
+using CoroQueue = std::queue<uint16_t>;
 
 struct CoroContext {
   CoroYield *yield;
@@ -82,6 +84,8 @@ constexpr uint16_t kCacheLineSize = 64;
 
 // for remote allocate
 constexpr uint64_t kChunkSize = 16 * MB;
+
+constexpr uint64_t kLocalLockNum    = 4 * MB;
 
 // for store root pointer
 constexpr uint64_t kRootPointerStoreOffest = kChunkSize / 2;
@@ -107,6 +111,8 @@ constexpr int64_t kPerCoroRdmaBuf = kPerThreadRdmaBuf / kMaxCoro;
 constexpr uint8_t kMaxHandOverTime = 0;
 
 constexpr int kIndexCacheSize = 1024;  // MB
+
+
 } // namespace define
 
 static inline unsigned long long asm_rdtsc(void) {
@@ -123,6 +129,9 @@ using Value = uint64_t;
 constexpr Key kKeyMin = std::numeric_limits<Key>::min();
 constexpr Key kKeyMax = std::numeric_limits<Key>::max();
 constexpr Value kValueNull = 0;
+
+constexpr bool enable_local_lock = true;
+constexpr bool enable_read_delegation = true;
 
 #if KEY_SIZE == 8
 using InternalKey = Key;

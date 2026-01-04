@@ -450,6 +450,7 @@ int main(int argc, char *argv[]) {
   }
   // tree->statistics();
   printf("[END]\n");
+  tree->index_cache_statistics();
   dsm_client->Barrier("fin");
   
   if (dsm_client->get_my_client_id() == 0) {

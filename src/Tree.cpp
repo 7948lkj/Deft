@@ -36,6 +36,7 @@ thread_local uint64_t Tree::coro_ops_cnt_start;
 thread_local uint64_t Tree::coro_ops_cnt_finish;
 thread_local GlobalAddress path_stack[define::kMaxCoro]
                                      [define::kMaxLevelOfTree];
+thread_local CoroQueue Tree::busy_waiting_queue;
 
 constexpr uint64_t XS_LOCK_FAA_MASK = 0x8000800080008000ul;
 // high->low
@@ -65,6 +66,8 @@ Tree::Tree(DSMClient *dsm_client, uint16_t tree_id)
 
   assert(dsm_client_->IsRegistered());
   print_verbose();
+
+  local_lock_table = new LocalLockTable();
 
   index_cache = new IndexCache(define::kIndexCacheSize);
 
@@ -670,11 +673,32 @@ next:
 void Tree::insert(const Key &k, const Value &v, CoroContext *ctx) {
   assert(dsm_client_->IsRegistered());
   int coro_id = ctx ? ctx->coro_id : 0;
+  bool insert_ret = false;
+  bool write_handover = false;
+  std::pair<bool, bool> lock_res = std::make_pair(false, false);
+  Key min = kKeyMin;
+  Key max = kKeyMax;
+  GlobalAddress root;
+  SearchResult result;
+  GlobalAddress p;
+  int level_hint = -1;
+  int cnt = 0;
+  bool res = false;
+
+
+
+  if(enable_local_lock){
+      lock_res = local_lock_table->acquire_local_write_lock(k, v, &busy_waiting_queue, ctx);
+      write_handover = (lock_res.first && !lock_res.second);
+  }
+  
+  if(write_handover){
+      insert_ret = true;
+      goto insert_finish;
+  }
 
   before_operation(ctx, coro_id);
 
-  Key min = kKeyMin;
-  Key max = kKeyMax;
 
   if (enable_cache) {
     GlobalAddress cache_addr, parent_addr;
@@ -689,7 +713,9 @@ void Tree::insert(const Key &k, const Value &v, CoroContext *ctx) {
 #endif
       if (status) {
         cache_hit[dsm_client_->get_my_thread_id()][0]++;
-        return;
+        insert_ret = true;
+        goto insert_finish;
+        // return;
       }
       // cache stale, from root,
       index_cache->invalidate(entry, dsm_client_->get_my_thread_id());
@@ -697,12 +723,10 @@ void Tree::insert(const Key &k, const Value &v, CoroContext *ctx) {
     cache_miss[dsm_client_->get_my_thread_id()][0]++;
   }
 
-  auto root = get_root_ptr(ctx);
-  SearchResult result;
+  root = get_root_ptr(ctx);
 
-  GlobalAddress p = root;
-  int level_hint = -1;
-  int cnt = 0;
+
+  p = root;
 
 next:
   if (!page_search(p, level_hint, p.read_gran, min, max, k, result, ctx)) {
@@ -733,7 +757,7 @@ next:
     }
   }
 
-  bool res = false;
+  
   
   // while (!res) {
 
@@ -755,6 +779,13 @@ next:
     }
   }
   // }
+
+insert_finish:
+    if(enable_local_lock){
+        local_lock_table->release_local_write_lock(k, lock_res);
+    }
+    return;
+
 }
 
 bool Tree::search(const Key &k, Value &v, CoroContext *ctx, int coro_id) {
@@ -769,6 +800,19 @@ bool Tree::search(const Key &k, Value &v, CoroContext *ctx, int coro_id) {
 
   bool from_cache = false;
   const CacheEntry *entry = nullptr;
+
+  std::pair<bool, bool> lock_res = std::make_pair(false, false);
+  bool read_handover = false;
+  bool search_ret = false;
+
+  if(enable_read_delegation){
+      lock_res = local_lock_table->acquire_local_read_lock(k, &busy_waiting_queue, ctx);
+      read_handover = (lock_res.first && !lock_res.second);
+  }
+  if(read_handover){
+      goto search_over;
+  }
+
   if (enable_cache) {
     // Timer timer;
     // timer.begin();
@@ -808,7 +852,9 @@ next:
   if (result.is_leaf) {
     if (result.val != kValueNull) {  // find
       v = result.val;
-      return true;
+      // return true;
+      search_ret = true;
+      goto search_over;
     }
     if (result.sibling != GlobalAddress::Null()) {  // turn right
       p = result.sibling;
@@ -816,7 +862,9 @@ next:
       level_hint = 0;
       goto next;
     }
-    return false;  // not found
+    search_ret = false;
+    goto search_over;
+    // return false;  // not found
   } else {         // internal
     if (result.sibling != GlobalAddress::Null()) {
       p = result.sibling;
@@ -830,6 +878,11 @@ next:
     }
     goto next;
   }
+search_over:
+    if(enable_read_delegation){
+        local_lock_table->release_local_read_lock(k, lock_res, search_ret, v);
+    }
+    return search_ret;
 }
 
 int Tree::range_query(const Key &from, const Key &to, Value *value_buffer,
@@ -2226,6 +2279,13 @@ void Tree::coro_master_ycsb(CoroYield &yield, int coro_cnt) {
   
       if (dsm_client_->PollRdmaCqOnce(next_coro_id)) {
         yield(worker[next_coro_id]);
+      }
+
+      if((enable_local_lock || enable_read_delegation) && !busy_waiting_queue.empty())
+      {
+          uint64_t next_coro_id = busy_waiting_queue.front();
+          busy_waiting_queue.pop();
+          yield(worker[next_coro_id]);
       }
 
     }

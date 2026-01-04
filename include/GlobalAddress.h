@@ -19,6 +19,9 @@ struct GlobalAddress {
 
   operator uint64_t() { return raw; }
 
+  GlobalAddress(uint64_t val) : raw(val) {}
+  GlobalAddress() : raw(0) {}
+
   // remain self cache line version!
   GlobalAddress &operator=(const GlobalAddress &other) {
     uint8_t ver = cl_ver;
@@ -28,7 +31,7 @@ struct GlobalAddress {
   }
 
   static GlobalAddress Null() {
-    static GlobalAddress zero;
+    static GlobalAddress zero(0);
     assert(zero.raw == 0);
     return zero;
   };

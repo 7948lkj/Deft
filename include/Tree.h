@@ -3,6 +3,7 @@
 // #include "DSM.h"
 #include "dsm_client.h"
 #include "Common.h"
+#include "LocalLockTable.h"
 #include <atomic>
 #include <stddef.h>
 #include <city.h>
@@ -612,8 +613,10 @@ class Tree {
   static thread_local uint64_t coro_ops_total;
   static thread_local uint64_t coro_ops_cnt_start;
   static thread_local uint64_t coro_ops_cnt_finish;
+  static thread_local CoroQueue busy_waiting_queue;
 
   LocalLockNode *local_locks[MAX_MACHINE];
+  LocalLockTable *local_lock_table;
 
   IndexCache *index_cache;
 
