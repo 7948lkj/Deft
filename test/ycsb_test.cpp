@@ -1,3 +1,4 @@
+#define STRIP_FLAG_HELP 1 
 #include "Timer.h"
 #include "Tree.h"
 #include "zipf.h"
@@ -101,6 +102,8 @@ std::uniform_int_distribution<Value> randval(0, UINT64_MAX);
 Tree *tree;
 DSMClient *dsm_client;
 
+extern bool enable_cache;
+
 
 inline uint64_t key_hash(const Key &k) {
   return CityHash64((char *)&k, sizeof(k));
@@ -197,8 +200,12 @@ void thread_load(int id) {
   uint64_t int_k;
   while (load_in >> op >> int_k) {
     // k = int2key(int_k);
+    k = int_k;
     assert(op == "INSERT");
     tree->insert(k, k + 23);
+    Value v = 0;
+    tree->search(k, v);
+    assert(v == k + 23);
     if (++ cnt % LOAD_HEARTBEAT == 0) {
       printf("thread %lu: %d load entries loaded.\n", loader_id, cnt);
     }
@@ -274,6 +281,8 @@ void thread_run(int id) {
     ready = true;
     warmup_cnt.store(-1);
   }
+  tree->index_cache_statistics();
+  tree->clear_statistics();
   while (warmup_cnt.load() != -1)
     ;
 
@@ -383,6 +392,10 @@ int main(int argc, char *argv[]) {
 // #endif
   dsm_client->RegisterThread();
   tree = new Tree(dsm_client);
+  
+  // Force enable index cache for YCSB workloads
+  enable_cache = true;
+  
   dsm_client->Barrier("benchmark");
 
   for (int i = 0; i < kThreadCount; i ++) {
