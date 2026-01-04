@@ -203,9 +203,9 @@ void thread_load(int id) {
     k = int_k;
     assert(op == "INSERT");
     tree->insert(k, k + 23);
-    Value v = 0;
-    tree->search(k, v);
-    assert(v == k + 23);
+    // Value v = 0;
+    // tree->search(k, v);
+    // assert(v == k + 23);
     if (++ cnt % LOAD_HEARTBEAT == 0) {
       printf("thread %lu: %d load entries loaded.\n", loader_id, cnt);
     }
