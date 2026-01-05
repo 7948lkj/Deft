@@ -24,7 +24,7 @@
 
 uint64_t cache_miss[MAX_APP_THREAD][8];
 uint64_t cache_hit[MAX_APP_THREAD][8];
-uint64_t latency[MAX_APP_THREAD][MAX_CORO_NUM][LATENCY_WINDOWS];
+uint64_t latency[MAX_APP_THREAD][MAX_CORO_NUM][LATENCY_WINDOWS] = {0};
 volatile bool need_stop = false;
 
 StatHelper stat_helper;
@@ -2135,13 +2135,13 @@ void Tree::coro_worker(CoroYield &yield, RequstGen *gen, int coro_id,
   ctx.yield = &yield;
 
   Timer coro_timer;
-  // auto thread_id = dsm_client_->get_my_thread_id();
+  auto thread_id = dsm_client_->get_my_thread_id();
 
   // while (true) {
   while (coro_ops_cnt_start < coro_ops_total) {
     auto r = gen->next();
 
-    // coro_timer.begin();
+    coro_timer.begin();
     ++coro_ops_cnt_start;
     if (lock_bench) {
       this->lock_bench(r.k, &ctx, coro_id);
@@ -2153,13 +2153,13 @@ void Tree::coro_worker(CoroYield &yield, RequstGen *gen, int coro_id,
         this->insert(r.k, r.v, &ctx);
       }
     }
-    // auto t = coro_timer.end();
-    // auto us_10 = t / 100;
-    // if (us_10 >= LATENCY_WINDOWS) {
-    //   us_10 = LATENCY_WINDOWS - 1;
-    // }
-    // latency[thread_id][us_10]++;
-    // stat_helper.add(thread_id, lat_op, t);
+    auto t = coro_timer.end();
+    auto us_10 = t / 100;
+    if (us_10 >= LATENCY_WINDOWS) {
+      us_10 = LATENCY_WINDOWS - 1;
+    }
+    latency[thread_id][coro_id][us_10]++;
+    stat_helper.add(thread_id, lat_op, t);
     ++coro_ops_cnt_finish;
   }
   // printf("thread %d coro_id %d start %lu finish %lu\n",

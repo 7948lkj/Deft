@@ -11,11 +11,12 @@
 #include <unistd.h>
 #include <vector>
 #include <random>
+#include <fstream>
 
 
 //////////////////// workload parameters /////////////////////
 
-// #define USE_CORO
+#define USE_CORO
 const int kCoroCnt = 3;
 
 // #define BENCH_LOCK
@@ -51,6 +52,12 @@ uint64_t total_time[MAX_APP_THREAD][8];
 double prefill_tp = 0.;
 double prefill_lat = 0.;
 int MAX_TOTAL_THREADS = 0;
+
+extern uint64_t latency[MAX_APP_THREAD][MAX_CORO_NUM][LATENCY_WINDOWS];
+uint64_t latency_th_all[LATENCY_WINDOWS];
+
+std::default_random_engine e;
+std::uniform_int_distribution<Value> randval(0, UINT64_MAX);
 
 Tree *tree;
 DSMClient *dsm_client;
@@ -92,7 +99,7 @@ class RequsetGenBench : public RequstGen {
 #else
     uint64_t dis = mehcached_zipf_next(&state);
     r.k = to_key(dis);
-    r.v = 23 + dis + seed;
+    r.v = 23 + randval(e);
 #endif
 
     return r;
@@ -349,6 +356,30 @@ void print_args() {
       FLAGS_num_bench_threads, FLAGS_read_ratio, FLAGS_zipf);
 }
 
+void save_latency(int epoch_id) {
+  // sum up local latency cnt
+  for (int i = 0; i < LATENCY_WINDOWS; ++i) {
+    latency_th_all[i] = 0;
+    for (int k = 0; k < MAX_APP_THREAD; ++k)
+      for (int j = 0; j < MAX_CORO_NUM; ++j) {
+        latency_th_all[i] += latency[k][j][i];
+    }
+  }
+  // store in file
+  std::ofstream f_out("../us_lat/epoch_" + std::to_string(epoch_id) + ".lat");
+  f_out << std::setiosflags(std::ios::fixed) << std::setprecision(1);
+  if (f_out.is_open()) {
+    for (int i = 0; i < LATENCY_WINDOWS; ++i) {
+      f_out << i / 10.0 << "\t" << latency_th_all[i] << std::endl;
+    }
+    f_out.close();
+  }
+  else {
+    printf("Fail to write file!\n");
+    assert(false);
+  }
+  memset(latency, 0, sizeof(uint64_t) * MAX_APP_THREAD * MAX_CORO_NUM * LATENCY_WINDOWS);
+}
 
 int main(int argc, char *argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
@@ -417,6 +448,8 @@ int main(int argc, char *argv[]) {
       stat_helper.counter_[i][k] = 0;
     }
   }
+
+  save_latency(1);
 
   uint64_t cluster_tp = dsm_client->Sum((uint64_t)(all_tp * 1000));
   printf("CN: %d, throughput %.4f Mops/s\n", dsm_client->get_my_client_id(),
