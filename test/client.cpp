@@ -158,7 +158,7 @@ void ycsb_d(int id) {
 std::atomic<int64_t> prefill_cnt{0};
 void thread_run(int id) {
 
-  // bindCore(id);
+  bindCore(id * 2 + 1);
 
   dsm_client->RegisterThread();
 
