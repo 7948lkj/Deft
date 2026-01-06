@@ -6,7 +6,7 @@ add_definitions(-DBOOST_COROUTINES_NO_DEPRECATION_WARNING)
 
 #Compiler options
 set(CMAKE_CXX_STANDARD 14)
-add_compile_options(-Wall -Wno-deprecated-declarations -Wsign-compare)
+add_compile_options(-Wall -Wno-deprecated-declarations -Wsign-compare -mcmodel=medium)
 
 # Link Options
 set(LINKS_FLAGS "-lcityhash -lboost_system -lboost_coroutine -lpthread -libverbs -lmemcached -lgflags")
