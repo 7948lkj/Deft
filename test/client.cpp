@@ -217,7 +217,7 @@ void thread_run(int id) {
     while (prefill_cnt.load() != MAX_TOTAL_THREADS)
       ;
     printf("node %d finish\n", dsm_client->get_my_client_id());
-    // dsm->barrier("prefill_finish");
+    dsm_client->Barrier("prefill_finish");
 
     printf("prefill time %lds\n", total_time[0][0] / 1000 / 1000 / 1000);
     prefill_tp = 0.;
