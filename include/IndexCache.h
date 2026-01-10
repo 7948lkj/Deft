@@ -450,8 +450,8 @@ inline void IndexCache::evict_one(int thread_id) {
 }
 
 inline void IndexCache::statistics() {
-  printf("[skiplist node: %ld]  [page cache: %ld]\n", skiplist_node_cnt.load(),
-         all_page_cnt - free_page_cnt.load());
+  printf("[skiplist node: %ld]  [page cache: %ld] [page capacity: %ld]\n", skiplist_node_cnt.load(),
+         all_page_cnt - free_page_cnt.load(), all_page_cnt);
 }
 
 inline void IndexCache::bench() {
