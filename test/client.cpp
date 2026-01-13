@@ -20,7 +20,7 @@
 const int kCoroCnt = 3;
 
 // #define BENCH_LOCK
-#define YCSB_D
+// #define YCSB_D
 #define YCSB_E
 
 #if defined(USE_CORO) && defined(YCSB_E)
