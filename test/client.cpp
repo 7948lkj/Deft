@@ -16,12 +16,12 @@
 
 //////////////////// workload parameters /////////////////////
 
-#define USE_CORO
+// #define USE_CORO
 const int kCoroCnt = 3;
 
 // #define BENCH_LOCK
-// #define YCSB_D
-// #define YCSB_E
+#define YCSB_D
+#define YCSB_E
 
 #if defined(USE_CORO) && defined(YCSB_E)
 #error "USE_CORO and YCSB_E cannot be defined at the same time"
@@ -310,9 +310,12 @@ void thread_run(int id) {
   }
 
   total_timer.begin();
+  Timer my_timer;
   for (int i = 0; i < FLAGS_ops_per_thread; ++i) {
+    my_timer.begin();
     uint64_t dis = mehcached_zipf_next(&state);
     uint64_t key = to_key(dis);
+    
 
     bool measure_lat = i % MEASURE_SAMPLE == 0;
     if (measure_lat) {
@@ -340,6 +343,11 @@ void thread_run(int id) {
       auto t = timer.end();
       stat_helper.add(id, lat_op, t);
     }
+    auto us_10 = my_timer.end() / 100;
+    if(us_10 >= LATENCY_WINDOWS){
+      us_10 = LATENCY_WINDOWS - 1;
+    }
+    latency[id][0][us_10]++;
 
     // tp[id][0]++;
   }
