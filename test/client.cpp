@@ -16,12 +16,12 @@
 
 //////////////////// workload parameters /////////////////////
 
-// #define USE_CORO
+#define USE_CORO
 const int kCoroCnt = 3;
 
 // #define BENCH_LOCK
 // #define YCSB_D
-#define YCSB_E
+// #define YCSB_E
 
 #if defined(USE_CORO) && defined(YCSB_E)
 #error "USE_CORO and YCSB_E cannot be defined at the same time"
